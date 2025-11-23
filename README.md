@@ -2,6 +2,11 @@
 
 Fetches balances from Kraken API and returns them as securities
 
+
+### ⚠️ This project is no longer maintained!
+
+**I am no longer using Kraken and therefore not maintaining this extension. The code remains available for reference and community use, but no new features or bug fixes will be provided. Feel free to fork this repository if you’d like to continue development.**
+
 ## Extension Setup
 
 You can get a signed version of this extension from
