@@ -1,2 +1,11 @@
+# macOS
 .DS_Store
 
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MoneyMoney local data (defensive; should not be in repo)
+MoneyMoney/

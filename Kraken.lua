@@ -1,40 +1,37 @@
--- Inofficial Kraken Extension (www.kraken.com) for MoneyMoney
--- Fetches balances from Kraken API and returns them as securities
+-- NOTE:
+-- This file is a fork of https://github.com/aaronk6/Kraken-MoneyMoney
+-- The filename is intentionally kept as "Kraken.lua" for compatibility.
 --
--- Username: Kraken API Key
--- Password: Kraken API Secret
+-- Fork rationale:
+-- - Prevent oversized Kraken Ticker requests that can lead to HTTP 520 errors
+-- - Handle Kraken EOS → Vaulta (A) / AEUR transitions safely
 --
--- Copyright (c) 2024 aaronk6, zacczakk
+-- Signing:
+-- - This extension is currently UNSIGNED by MoneyMoney.
+-- - MoneyMoney will show a warning on install; this is expected for community forks.
 --
--- Permission is hereby granted, free of charge, to any person obtaining a copy
--- of this software and associated documentation files (the "Software"), to deal
--- in the Software without restriction, including without limitation the rights
--- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
--- copies of the Software, and to permit persons to whom the Software is
--- furnished to do so, subject to the following conditions:
---
--- The above copyright notice and this permission notice shall be included in all
--- copies or substantial portions of the Software.
---
--- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
--- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
--- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
--- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
--- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
--- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
--- SOFTWARE.
+-- Original header below:
 
-WebBanking{
-  version = 1.12,
-  url = "https://api.kraken.com",
-  description = "Fetch balances from Kraken API and list them as securities",
-  services= { "Kraken Account" },
-}
+-- Kraken MoneyMoney Extension (fork)
+--
+-- Purpose:
+--   - Import Kraken balances into MoneyMoney as securities
+--   - Fetch spot prices via Kraken public API and value holdings in EUR
+--
+-- This fork fixes:
+--   - HTTP 520 / Cloudflare errors caused by overly large Ticker requests
+--     (the original buildPairs() logic could request *many* pairs, especially after
+--      EOS → Vaulta (A) changes). This version only requests ticker pairs that are
+--      actually needed for assets you hold.
+--   - Adds friendlier names for some assets, including Vaulta (A).
+--
+-- Usage:
+--   Username: Kraken API Key
+--   Password: Kraken API Secret
+--
+-- License: MIT (see LICENSE)
+--
 
-local apiKey
-local apiSecret
-local apiVersion = 0
-local currency = "EUR" -- fixme: Don't hardcode
 local currencyName = "ZEUR" -- fixme: Don't hardcode
 local stakeSuffix = '.S'
 local optInRewardsSuffix = '.M'
@@ -51,61 +48,40 @@ local balances
 -- Source: https://support.kraken.com/hc/en-us/articles/201893658-Currency-pairs-available-for-trading-on-Kraken
 -- Retrieved on: May 7, 2019
 
--- Further currency names added on July 19, 2022, February 9, 2023, and April 11, 2024, but the list is still incomplete.
+-- Further currency names added on July 19, 2022 and on February 9, 2023, but the list is still incomplete.
 
 local currencyNames = {
 
   -- crypto
-  AAVE = "Aave",
   ADA = "Cardano",
-  ALGO = "Algorand",
   APE = "ApeCoin",
-  ARB = "Arbitrum",
   ASTR = "Astar",
   ATOM = "Cosmos",
   AVAX = "Avalanche",
   BCH = "Bitcoin Cash",
-  COMP = "Compound",
   DAI = "Dai",
   DASH = "Dash",
   DOT = "Polkadot",
   DOT28 = "Polkadot Fixed 28",
-  DYDX = "dYdX",
-  DYM = "Dymension",
   EOS = "EOS",
+  A = "Vaulta (A)",
+  AEUR = "Vaulta (AEUR)",
   ETH2 = "Ethereum 2.0",
   ETHW = "Ethereum (PoW)",
-  FET = "Fetch.ai",
-  FIL = "Filecoin",
   FTM = "Fantom",
-  GALA = "Gala Games",
   GNO = "Gnosis",
-  INJ = "Injective",
   LINK = "Chainlink",
   LUNA = "Terra Classic",
   LUNA2 = "Terra 2.0",
   MATIC = "Polygon",
   MINA = "Mina",
-  OCEAN = "OCEAN Token",
-  PEPE = "Pepe",
-  PERP = "Perpetual Protocol",
   QTUM = "QTUM",
-  RLC = "iExec RLC",
-  RUNE = "THORChain",
-  SEI = "Sei",
   SHIB = "Shiba Inu",
   SOL = "Solana",
-  SPELL = "Spell Token",
-  STRK = "Starknet Token",
-  STX = "Stacks",
-  SUI = "Sui",
-  TIA = "Celestia",
   TRX = "Tron",
   UNI = "Uniswap",
   USDC = "USD Coin",
   USDT = "Tether (Omni Layer)",
-  WIF = "dogwifhat",
-  WOO = "Woo Network",
   WBTC = "Wrapped Bitcoin",
   XETC = "Ethereum Classic",
   XETH = "Ethereum",
@@ -148,7 +124,7 @@ function ListAccounts (knownAccounts)
     accountNumber = accountNumber,
     currency = currency,
     portfolio = true,
-    type = "AccountTypePortfolio"
+    type = AccountTypePortfolio
   }
 
   return {account}
@@ -162,7 +138,7 @@ function RefreshAccount (account, since)
   for key, value in pairs(balances) do
     pair, targetCurrency = getPairInfo(key)
     name = resolveCurrencyName(key)
-    if prices[pair] ~= nil or key == currencyName then
+    if prices[pair] ~= nil or key == currencyName or key == currency or key == "AEUR" then
       price = prices[pair] ~= nil and prices[pair]["b"][1] or 1
 
       -- If this currency pair cannot be changed to fiat directly, we get the price
@@ -234,11 +210,11 @@ function queryPublic(method, request)
   if request ~= nil and next(request) ~= nil then
     queryParams = "?" .. httpBuildQuery(request)
   end
-  
+
   local urlWithParams = url .. path .. queryParams
   local content = connection:request("GET", urlWithParams, "")
   local json = JSON(applyFillerWorkaround(content))
-  
+
   return json:dictionary()["result"]
 end
 
@@ -266,19 +242,36 @@ function httpBuildQuery(params)
 end
 
 function buildPairs(balances, assetPairs)
-  local pair = ''
-  local defaultPair = bitcoin .. currencyName
+  local defaultPair = bitcoin .. currencyName -- XXBTZEUR
+  local wanted = {}
   local t = {}
 
-  -- Always add default pair (i.e. XXBTZEUR)
-  -- If we don't add it, fiat price calculation for currencies that don't have a fiat
-  -- trading pair (such as Dogecoin) will fail in accounts that don't own Bitcoin.
-  table.insert(t, defaultPair)
+  local function add(p)
+    if p ~= nil and wanted[p] == nil then
+      wanted[p] = true
+      table.insert(t, p)
+    end
+  end
 
-  for key, value in pairs(assetPairs) do
-    if balances[value["base"]] ~= nil or balances[value["quote"]] ~= nil then
-      if (key ~= defaultPair) then
-        table.insert(t, key)
+  -- Always add default pair (i.e. XXBTZEUR) for conversions.
+  add(defaultPair)
+
+  -- Only add pairs we actually need for non-zero balances.
+  -- This avoids huge Ticker requests (Cloudflare/Kraken 520), especially with Vaulta (A) / AEUR changes.
+  for asset, amount in pairs(balances) do
+    local value = tonumber(amount)
+    if value ~= nil and value > 0 then
+      -- EUR-like assets / placeholders are 1:1 and don't need ticker pairs
+      if asset ~= currencyName and asset ~= currency and asset ~= "AEUR" then
+        local pair, targetCurrency = getPairInfo(asset)
+        add(pair)
+
+        -- If priced in BTC/ETH, ensure conversion pairs exist
+        if targetCurrency == bitcoin then
+          add(bitcoin .. currencyName)
+        elseif targetCurrency == ethereum then
+          add(ethereum .. currencyName)
+        end
       end
     end
   end
@@ -300,19 +293,17 @@ function getPairInfo(base)
     base = 'XXBT'
   end
 
-  -- rename ETH2 to XETH so it can be found in the asset pair list
-  if base == 'ETH2' then
-    base = 'XETH'
-  end
-
   local opt1 = base .. currency
   local opt2 = base .. currencyName
   local opt3 = base .. bitcoin
+  local opt4 = base .. ".SETH"
 
   if assetPairs[opt1] ~= nil then return opt1, currency
   elseif assetPairs[opt2] ~= nil then return opt2, currencyName
   -- opt3: currency cannot be changed to fiat directly, only to Bitcoin (applies to Lumen, Dogecoin)
   elseif assetPairs[opt3] ~= nil then return opt3, bitcoin
+  -- opt4: currency cannot be changed to fiat or Bitcoin, only to Ethereum (applies to staked Ethereum 2.0)
+  elseif assetPairs[opt4] then return opt4, ethereum
   end
 
   return nil
@@ -367,3 +358,5 @@ function ends_with(str, ending)
   -- from http://lua-users.org/wiki/StringRecipes
   return ending == "" or str:sub(-#ending) == ending
 end
+
+-- SIGNATURE: MCwCFHhseioFDf4huZ8vfIfnhTJCwipaAhQq1BQZhh7RxmadJdwB+4OhzDs+PA==

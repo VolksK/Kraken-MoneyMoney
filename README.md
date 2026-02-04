@@ -1,41 +1,88 @@
-# Kraken-MoneyMoney
+# Kraken MoneyMoney Extension (fork)
 
-Fetches balances from Kraken API and returns them as securities
+This repository is a **fork** of:
+https://github.com/aaronk6/Kraken-MoneyMoney
+
+The original project appears to be unmaintained. This fork stays intentionally close
+to upstream and only fixes real-world breakage observed in 2025/2026 (stability and
+asset-transition handling).
+
+## 🔐 MoneyMoney signing status
+
+> **Status: Unsigned extension**
+>
+> This extension is currently **not signed by MoneyMoney**.
+> When installing it, MoneyMoney will display a security warning and ask you to
+> explicitly allow the extension. This is expected for community forks.
+>
+> Only the MoneyMoney developer can sign extensions. A signing request may be
+> submitted after some real-world usage.
+
+This repository contains a **MoneyMoney** extension to import **Kraken** balances and value them in **EUR**.
+
+It is a fork of a community extension that is no longer maintained upstream. This fork focuses on being **stable** and **boring**.
+
+## What’s different in this fork
+
+### ✅ Fix: Kraken / Cloudflare `HTTP 520`
+Some users hit `HTTP 520` (often Cloudflare) because the extension requested a **massive** ticker list.
+This fork changes the ticker selection so it only requests pairs that are **actually needed** for assets you hold.
+
+### ✅ EOS → Vaulta (A) / `AEUR` handling
+Kraken’s EOS→Vaulta situation (and Germany/DLT restrictions) can lead to balances/valuation placeholders such as `AEUR`.
+This fork:
+- labels `A` as **“Vaulta (A)”**
+- treats `AEUR` as **EUR-like (1:1)** for valuation purposes (so your portfolio doesn't “vanish”)
+
+> Note: `AEUR` is treated as EUR-like **for display/valuation only**. Kraken may restrict trading/withdrawal.
+
+## Installation (MoneyMoney on macOS)
+
+1. Download the Lua file: `Kraken-MoneyMoney-VaultaFix.lua`
+2. Open **MoneyMoney** → **Help** → **Show Database in Finder**
+3. Copy the Lua file into:
+   - `MoneyMoney/Extensions/`  
+   (create the folder if it does not exist)
+4. Restart MoneyMoney
+5. Add a new account:
+   - **Type:** “Kraken MoneyMoney Extension (fork)” (or the name you set in the Lua)
+   - **Username:** Kraken API Key
+   - **Password:** Kraken API Secret
+
+### Recommended Kraken API key permissions
+- `Query Funds` (required)
+- (Optional) `Query Ledger Entries` if you later extend it to fetch transactions  
+No trading or withdrawal permissions are needed.
 
 
-### ⚠️ This project is no longer maintained!
+**Note:** MoneyMoney will show a warning because the extension is **unsigned**. Confirm the prompt to enable it.
 
-**I am no longer using Kraken and therefore not maintaining this extension. The code remains available for reference and community use, but no new features or bug fixes will be provided. Feel free to fork this repository if you’d like to continue development.**
+## Troubleshooting
 
-## Extension Setup
+### Still getting HTTP 520?
+- Confirm you are running the forked Lua file, not the old one.
+- If you hold many assets and still see issues, we can add chunking for the ticker requests.
 
-You can get a signed version of this extension from
+### “0 price” / missing valuation
+- Kraken sometimes uses alternative pair names (e.g. `XBT` vs `XXBT` style prefixes).
+- Open an issue with:
+  - the asset code shown in MoneyMoney
+  - the pair that is missing (if you can find it in Kraken’s UI / API)
 
-* my [GitHub releases](https://github.com/aaronk6/Kraken-MoneyMoney/releases/latest) page, or
-* the [MoneyMoney Extensions](https://moneymoney-app.com/extensions/) page
+## Development
 
-Once downloaded, move `Kraken.lua` to your MoneyMoney Extensions folder.
+This is a single-file MoneyMoney extension.
 
-**Note:** This extension requires MoneyMoney Version 2.2.17 (284) or newer.
+PRs welcome:
+- Better asset/pair normalisation (Kraken’s aliases can be… creative)
+- Optional “ticker chunking” for very large portfolios
+- Optional transaction import
 
-## Account Setup
+## Credits
 
-### Kraken
+- Original community extension authors (see Git history / original repo)
+- This fork: Vaulta/AEUR and HTTP 520 stability fixes
 
-1. Log in to your Kraken account
-2. Go to Settings → API
-3. Click “Generate New Key”
-4. Under “Key Permissions”, check “Query Funds” (the others aren’t needed)
-5. Click “Generate Key”
+## License
 
-### MoneyMoney
-
-Add a new account (type “Kraken Account”) and use your Kraken API key as username and your Kraken API secret as password.
-
-## Screenshots
-
-![MoneyMoney screenshot with Kraken balances](screenshots/balances.png)
-
-## Known Issues and Limitations
-
-* Always assumes EUR as base currency
+MIT — see [LICENSE](LICENSE).
